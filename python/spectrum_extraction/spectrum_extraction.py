@@ -4,8 +4,11 @@ from astropy.io import fits
 from fits_utils import flatten_header, hcongrid
 
 def spec_extract(spec_cube, mask, npix=1, weight=True):
-    assert spec_cube.ndim == 3
-    assert spec_cube.shape[1:] == mask.shape
+
+    if spec_cube.ndim != 3:
+        raise ValueError("Need a cube with ndim=3.  Try squeezing it.")
+    if spec_cube.shape[1:] != mask.shape:
+        raise ValueError("Mask shape must match cube shape")
 
     border_mask = binary_dilation(mask, iterations=npix) - mask > 0
 
