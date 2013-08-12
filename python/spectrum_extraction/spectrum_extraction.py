@@ -9,10 +9,10 @@ def spec_extract(spec_cube, mask, npix=1, weight=True):
 
     border_mask = binary_dilation(mask, iterations=npix) - mask > 0
 
-    sl = (None,) + np.nonzero(border_mask)
-    border_spectrum = spec_cube[sl].squeeze().mean(axis=0)
+    sl = (slice(None),) + np.nonzero(border_mask)
+    border_spectrum = spec_cube[sl].squeeze().mean(axis=1)
 
-    sl = (None,) + np.nonzero(mask)
+    sl = (slice(None),) + np.nonzero(mask)
 
     if weight:
         wts = mask[np.nonzero(mask)]
@@ -20,7 +20,7 @@ def spec_extract(spec_cube, mask, npix=1, weight=True):
         wts = mask.astype('bool')
 
     spectra = spec_cube[sl].squeeze()
-    spectrum = (spectra*wts[:,np.newaxis]).sum(axis=0)/wts.sum()
+    spectrum = (spectra*wts[np.newaxis,:]).sum(axis=1)/wts.sum()
 
     return spectrum,border_spectrum
 
