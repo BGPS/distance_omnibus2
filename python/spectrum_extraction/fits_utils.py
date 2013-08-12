@@ -101,3 +101,17 @@ def flatten_header(header):
     newheader.update('NAXIS',2)
 
     return newheader
+
+def get_velocity_array(header):
+    for k in header:
+        if header[k] == 'VELOCITY' and k[:-1] == 'CTYPE':
+            vaxis = int(k[-1])
+
+    crpix = header['CRPIX%i' % vaxis]
+    naxis = header['NAXIS%i' % vaxis]
+    crval = header['CRVAL%i' % vaxis]
+    cdelt = header['CDELT%i' % vaxis] if 'CDELT%i' % vaxis in header else 'CD%i_%i' % (vaxis,vaxis)
+
+    arr = (np.arange(naxis)+1-crpix)*cdelt + crval
+
+    return arr
