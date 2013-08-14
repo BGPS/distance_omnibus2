@@ -114,3 +114,5 @@ def DPDF_pcadist(distances,glon,glat,vlsr, \
 # tAKE WIDTH AS 20% OF DISTANCE DETERMINATION.  WITH CAPS LOCK ON
     dpdf = np.exp(-((distances-Distance)/(0.2*Distance))**2/2)
     return(dpdf)
+
+#Here is a comment
