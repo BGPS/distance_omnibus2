@@ -3,7 +3,7 @@ from astropy.io import fits
 import astropy.nddata as nd
 import matplotlib.pyplot as p
 
-def structure_function(data, ChannelWidth = 1.0, PixelScale = 1.0, plot = False):
+def pca_distance(data, ChannelWidth = 1.0, PixelScale = 1.0, plot = False):
     nv = data.shape[0]
     nspatial = data.shape[1]*data.shape[2]
     nchan = data.shape[0]
