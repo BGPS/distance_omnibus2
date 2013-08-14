@@ -80,8 +80,8 @@ def pca_distance(data, ChannelWidth = 1.0, PixelScale = 1.0, plot = False):
     return(Distance)
 
 def subcube_extract(glon, glat, vlsr, \
-                        GRSfile='/UBC-O/erosolo/astro/bgps/scutum/edmonton2013/grs-30-cube.fits', \
-                        border = [30,50,50], threshold = 0.4):
+                        border = [30,50,50], threshold = 0.4,\
+                        GRSfile='/UBC-O/erosolo/astro/bgps/scutum/edmonton2013/grs-30-cube.fits'):
     GRSCube = fits.getdata(GRSfile)
     GRSheader = fits.getheader(GRSfile)
     w = wcs.WCS(GRSheader)
@@ -95,7 +95,6 @@ def subcube_extract(glon, glat, vlsr, \
     y2 = int( np.ceil( min([pixels[1]+border[1],GRSCube.shape[1]]) ) )
     v1 = int( np.floor( max([pixels[0]-border[0],0]) ) )
     v2 = int( np.ceil( min([pixels[0]+border[0],GRSCube.shape[0]]) ) )
-
     subcube = GRSCube[v1:v2,y1:y2,x1:x2]
     label,nFeature = ndim.label(subcube>threshold)
     hit = np.asarray(pixels-[v1,y1,x1],dtype='int8')
@@ -104,3 +103,16 @@ def subcube_extract(glon, glat, vlsr, \
     
     subcube[np.logical_not(mask)]=np.nan
     return(subcube)
+
+def DPDF_pcadist(distances,glon,glat,vlsr, \
+                     GRSfile='/UBC-O/erosolo/astro/bgps/scutum/edmonton2013/grs-30-cube.fits'):
+    subcube = subcube_extract(glon,glat,vlsr,GRSfile=GRSfile)
+    hd = fits.getheader(GRSfile)
+    PixelScale = hd['CDELT2']
+    ChannelWidth = hd['CDELT3']/1e3
+    Distance = pca_distance(subcube,PixelScale = PixelScale, ChannelWidth = ChannelWidth)
+# tAKE WIDTH AS 20% OF DISTANCE DETERMINATION.  WITH CAPS LOCK ON
+    dpdf = np.exp(-((distances-Distance)/(0.2*Distance))**2/2)
+    return(dpdf)
+
+#Here is a comment
