@@ -14,7 +14,7 @@ pb = progressbar.ProgressBar()
 
 # 306 = 60 km/s
 cropn = 50
-grs = fits.getdata('grs-28-cube.fits')[:306,cropn:-cropn,cropn:-cropn]
+grs = fits.getdata('grs-28-cube.fits')#[:306,cropn:-cropn,cropn:-cropn]
 grsh = fits.getheader('grs-28-cube.fits')
 
 # In [55]: (1*u.K).to(u.Jy,jytok((46*u.arcsec)**2*pi,110*u.GHz))
@@ -191,7 +191,9 @@ for jj,trunk in enumerate(shallow_slopes):
         R[1] = max([R[1],max(r)])
 
     R = np.linspace(R[0],R[1],1000)
-    ax.plot(R,0.7*R, color='r', linestyle=":")
+    ax.plot(R,0.7*R, color='r', linestyle="--")
+    ax.plot(R,0.7*R*(10/7.5)**0.5, color='r', linestyle=":")
+    ax.plot(R,0.7*R*(5/7.5)**0.5, color='r', linestyle="-.")
     ax.plot(R,np.polyval(trunkslopes[trunk], R), color='k', linestyle='--', linewidth=2, alpha=0.5)
     if jj % 6 != 0:
         ax.set_yticks([])
