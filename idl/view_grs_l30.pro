@@ -48,6 +48,7 @@ thco   = dblarr(n)
 covlsr = dblarr(n)
 colw   = dblarr(n)
 thcoon = dblarr(n)
+mvrat  = bytarr(n)
 
 FOR i=0,n-1 DO BEGIN
    
@@ -75,8 +76,13 @@ FOR i=0,n-1 DO BEGIN
       print,[ns,minmax(v_std[sigind]),max(v_std[sigind])-min(v_std[sigind])]
       
       step = sigind[1:*]-sigind[0:*]
+      ;; help,step,sigind
+      
+      
+      ;;===================================================
       IF max(step) EQ 1 THEN BEGIN ; Single peak
          
+         ;;GOTO, skipsingle
          ;; print,'PLOT!!!'
          estimates = [max(sp),v_std[median(sigind)],2]
          yf = mpfitpeak(v_std,sp,A,NTERMS=3,$
@@ -92,8 +98,61 @@ FOR i=0,n-1 DO BEGIN
             cgOplot,v_std,yf,color='orange',thick=2
             vline,A[1],color='orange',thick=2,linestyle=4
          ENDIF
-      ENDIF
-      
+         
+         skipsingle:
+      ENDIF ELSE BEGIN          ; Multipeak
+         sigind = [sigind,n_elements(sp)]
+         step = sigind[1:*]-sigind[0:*]
+         
+         
+         ist = [where(step NE 1),n_elements(step)-1]
+         ist = ist[uniq(ist,sort(ist))] ; Make unique
+         
+         nseg = n_elements(ist)
+         print,'N Segments: ',nseg
+         startind = 0
+         ;; print,nseg,ist
+         ;; print,sigind
+         
+         tpk = 0.
+         
+         tastar = fltarr(nseg)
+         
+         FOR jjj=0,nseg-1 DO BEGIN
+            
+            sigind2 = sigind[startind:ist[jjj]]
+            
+            estimates = [max(sp),v_std[median(sigind2)],2]
+            yf = mpfitpeak(v_std,sp,A,NTERMS=3,$
+                           estimates=estimates)
+            
+            ;;print,A[1],A[0]
+            
+            tastar[jjj] = A[0]
+            
+            IF A[0] LT tpk THEN CONTINUE
+            covlsr[i] = A[1]
+            colw[i]   = A[2] * 2.355
+            thco[i]   = max(sp,jjjj)
+            thcoon[i] = spon[jjjj]
+            
+            tpk = A[0]
+            
+            ;; print,'Segment '+strtrim(jjj+1,2),$
+            ;;       n_elements(step[startind:ist[jjj]])
+            
+            ;; print,step[startind:ist[jjj]]
+            ;; print,sigind[startind:ist[jjj]]
+            
+            
+            startind=ist[jjj]+1
+         ENDFOR
+         
+         ;; FIND THE SMALLEST TPK/TASTAR RATIO GREATER THAN 1!
+         
+         print,'TASTAR: ',tpk / tastar
+         
+      ENDELSE
    ENDIF
    
    IF ~skipplot THEN wait,0.5
@@ -166,10 +225,15 @@ multiplot_xm,[2,1],xgap=0.04,mpcharsize=1.0
 ;;        xtit='!u13!nCO V!dLSR!n  [km s!u-1!n]',$
 ;;        ytit='HCO!u+!n V!dLSR!n  [km s!u-1!n]',charsize=1.0
 
-ikp = where(covlsr NE 0 AND v.mol[0].vlsr NE 0)
+ikp = where(covlsr NE 0 AND v.mol[0].vlsr NE 0, nikp)
 cgPlot,covlsr[ikp],v[ikp].mol[0].vlsr,psym=16,symsize=0.4,xr=[-50,150],$
        xtit='!u13!nCO V!dLSR!n  [km s!u-1!n]',$
        ytit='HCO!u+!n V!dLSR!n  [km s!u-1!n]',charsize=1.0
+
+iki = where( abs(covlsr[ikp]-v[ikp].mol[0].vlsr) GE 5, niki)
+al_legend,/top,/left,box=0,charsize=0.8,$
+          ['Fraction w/ > 5 km/s diff: '+$
+           string(float(niki)/nikp,format="(F0.3)")]
 
 multiplot,/doyaxis
 
@@ -180,6 +244,7 @@ plothist,covlsr[ikp]-v[ikp].mol[0].vlsr,bin=0.2,xr=[-12,12],/xst,$
          charsize=1.0,ytit='N per bin',xarr,yarr
 yf = mpfitpeak(xarr,yarr,A,nterms=3)
 cgOplot,xarr,yf,color='orange'
+cgAxis,xaxis=0,/xst,xtickformat='blank_axis'
 al_legend,/top,/right,[cgsig+' = '+string(A[2],format="(F0.2)")+' km/s'],$
           charsize=0.8
 
