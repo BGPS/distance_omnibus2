@@ -21,6 +21,9 @@ grsh = fits.getheader('grs-28-cube.fits')
 # Out[55]: <Quantity 58.0861309512 Jy>
 metadata = dict(data_unit=u.Jy/58.06, spatial_scale=22.5*u.arcsec, velocity_scale=grsh['CDELT3']*u.m/u.s, vaxis=0, wcs=wcs.WCS(grsh))
 
+# surface density ~ 4.92x10^20 T_mb dV = 4.92x10^20 * 58.06 * dv
+# then divide by 2e33, multiply by 1.67e-24, and multiply by 3.08e18**2
+
 if 'grsD' not in locals():
     grsD = Dendrogram.compute(data=grs, min_value=0.25, min_npix=10, min_delta=0.5, verbose=True)
 
@@ -198,7 +201,7 @@ for jj,trunk in enumerate(shallow_slopes):
     if jj % 6 != 0:
         ax.set_yticks([])
     ax.annotate("%0.2f" % (leaf_vcen[trunk_leaves[trunk][0]][-1]/1000.), (0.7,0.3), xycoords='axes fraction')
-    ax.annotate("%0.2f" % (trunkslopes[trunk][0]), (0.7,0.2), xycoords='axes fraction')
+    ax.annotate("%0.1f,%0.1g" % tuple(trunkslopes[trunk]), (0.7,0.2), xycoords='axes fraction')
     ax.annotate(str(trunk), (0.7,0.1), xycoords='axes fraction')
     if jj % 36 == 33:
         ax.set_xlabel("R (pc at D=7.5 kpc)")
