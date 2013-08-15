@@ -2,6 +2,7 @@
 
 restore,'/d1/BGPS/distance-omnibus/local/BGPS_V2_grs_spectra_r46.sav',/ver
 restore,'/d1/BGPS/distance-omnibus/local/BGPS_V2_velocities.sav',/ver
+s = read_mrt('/d1/BGPS/distance-omnibus/local/mrt/bolocatV210.mrt')
 
 help,grs,/str
 
@@ -30,6 +31,7 @@ print,n
 
 grs = grs[ind]
 v   = v[ind]
+s   = s[ind]
 
 print,minmax(v.l)
 
@@ -41,12 +43,17 @@ v_std = findgen(1500)*0.2 + (-100.)
 SKIPPLOT = 1b
 
 
-hcop = v.mol[0].tmb * (~v.mol[0].multiv)
-thco = dblarr(n)
+hcop   = v.mol[0].tmb * (~v.mol[0].multiv)
+thco   = dblarr(n)
+covlsr = dblarr(n)
+colw   = dblarr(n)
+thcoon = dblarr(n)
+mvrat  = bytarr(n)
 
 FOR i=0,n-1 DO BEGIN
    
-   sp = grs[i].spectrum
+   sp   = grs[i].spectrum
+   spon = grs[i].onspec
    
    IF ~skipplot THEN BEGIN
       
@@ -69,37 +76,130 @@ FOR i=0,n-1 DO BEGIN
       print,[ns,minmax(v_std[sigind]),max(v_std[sigind])-min(v_std[sigind])]
       
       step = sigind[1:*]-sigind[0:*]
+      ;; help,step,sigind
+      
+      
+      ;;===================================================
       IF max(step) EQ 1 THEN BEGIN ; Single peak
          
+         ;;GOTO, skipsingle
          ;; print,'PLOT!!!'
          estimates = [max(sp),v_std[median(sigind)],2]
          yf = mpfitpeak(v_std,sp,A,NTERMS=3,$
                         estimates=estimates)
+         covlsr[i] = A[1]
+         colw[i]   = A[2] * 2.355
+         thco[i]   = max(sp,jjj)
+         thcoon[i] = spon[jjj]
          
-         thco[i] = max(sp)
          ;; print,estimates
          ;; print,A
          IF ~skipplot THEN BEGIN
             cgOplot,v_std,yf,color='orange',thick=2
             vline,A[1],color='orange',thick=2,linestyle=4
          ENDIF
-      ENDIF
-      
+         
+         skipsingle:
+      ENDIF ELSE BEGIN          ; Multipeak
+         sigind = [sigind,n_elements(sp)]
+         step = sigind[1:*]-sigind[0:*]
+         
+         
+         ist = [where(step NE 1),n_elements(step)-1]
+         ist = ist[uniq(ist,sort(ist))] ; Make unique
+         
+         nseg = n_elements(ist)
+         print,'N Segments: ',nseg
+         startind = 0
+         ;; print,nseg,ist
+         ;; print,sigind
+         
+         tpk = 0.
+         
+         tastar = fltarr(nseg)
+         
+         FOR jjj=0,nseg-1 DO BEGIN
+            
+            sigind2 = sigind[startind:ist[jjj]]
+            
+            estimates = [max(sp),v_std[median(sigind2)],2]
+            yf = mpfitpeak(v_std,sp,A,NTERMS=3,$
+                           estimates=estimates)
+            
+            ;;print,A[1],A[0]
+            
+            tastar[jjj] = A[0]
+            
+            IF A[0] LT tpk THEN CONTINUE
+            covlsr[i] = A[1]
+            colw[i]   = A[2] * 2.355
+            thco[i]   = max(sp,jjjj)
+            thcoon[i] = spon[jjjj]
+            
+            tpk = A[0]
+            
+            ;; print,'Segment '+strtrim(jjj+1,2),$
+            ;;       n_elements(step[startind:ist[jjj]])
+            
+            ;; print,step[startind:ist[jjj]]
+            ;; print,sigind[startind:ist[jjj]]
+            
+            
+            startind=ist[jjj]+1
+         ENDFOR
+         
+         ;; FIND THE SMALLEST TPK/TASTAR RATIO GREATER THAN 1!
+         
+         print,'TASTAR: ',tpk / tastar
+         
+      ENDELSE
    ENDIF
    
    IF ~skipplot THEN wait,0.5
 ENDFOR
 
+;;===================================================================
+;; CO TA vs. BGPS Flux Density
 ;; window,0,xsize=800,ysize=800
-myps,'./hcop_thco_ta.eps'
+myps,'../plots/bgps_thco_fd.eps'
+cgPlot,thco,s.flux,symsize=0.5,psym=16,xtit='!u13!nCO On-Off T!dA!u*!n  [K]',$
+       ytit='BGPS Flux Density  [Jy]',/ylog,ytickformat='exponent10',$
+       charsize=1.0,xr=[0.1,4.5],/xst ;,xr=[0,2],yr=[0,2]
+;; one2one,color='red',linestyle=3
+myps,/done
+
+;;===================================================================
+;; CO TA ON vs. BGPS Flux Density
+;; window,0,xsize=800,ysize=800
+myps,'../plots/bgps_thcoon_fd.eps'
+cgPlot,thcoon,s.flux,symsize=0.5,psym=16,xtit='!u13!nCO T!dA!u*!n  [K]',$
+       ytit='BGPS Flux Density  [Jy]',/ylog,ytickformat='exponent10',$
+       charsize=1.0,xr=[0.1,5.5],/xst ;,xr=[0,2],yr=[0,2]
+;; one2one,color='red',linestyle=3
+myps,/done
+
+;;===================================================================
+;; HCOP vs. BGPS Flux Density
+;; window,0,xsize=800,ysize=800
+myps,'../plots/bgps_hcop_fd.eps'
+cgPlot,hcop,s.flux,symsize=0.5,psym=16,xtit='HCO!u+!n T!dA!u*!n  [K]',$
+       ytit='BGPS Flux Density  [Jy]',/ylog,ytickformat='exponent10',$
+       charsize=1.0,xr=[0.1,5.5],/xst ;,xr=[0,2],yr=[0,2]
+;; one2one,color='red',linestyle=3
+myps,/done
+
+;;===================================================================
+;; Antenna Temperature
+;; window,0,xsize=800,ysize=800
+myps,'../plots/hcop_thco_ta.eps'
 cgPlot,thco,hcop,symsize=0.5,psym=16,xtit='!u13!nCO On-Off T!dA!u*!n  [K]',$
        ytit='HCO!u+!n(3-2) T!dA!u*!n  [K]',yr=[-0.5,5.5],/yst,$
-       charsize=1.0                ;,xr=[0,2],yr=[0,2]
+       charsize=1.0,xr=[-0.5,4.5] ;,xr=[0,2],yr=[0,2]
 one2one,color='red',linestyle=3
 myps,/done
 
 ;; window,1,xsize=800,ysize=800
-myps,'./hcop_thco_cdf.eps'
+myps,'../plots/hcop_thco_cdf.eps'
 jj = where(thco NE 0)
 thcojj = thco[jj]
 hcopjj = hcop[jj]
@@ -115,6 +215,74 @@ cgOplot,thi0,cdf0,color='blue'
 al_legend,color=['black','blue'],linestyle=0,['Y','N']+' HCO!u+!n',$
           /bottom,/right,box=0,linsize=0.5
 myps,/done
+
+
+;;===================================================================
+;; Velocities
+myps,'../plots/hcop_thco_vlsr.eps',xsize=10
+multiplot_xm,[2,1],xgap=0.04,mpcharsize=1.0
+;; cgPlot,covlsr,v.mol[0].vlsr,psym=16,symsize=0.4,xr=[-50,150],$
+;;        xtit='!u13!nCO V!dLSR!n  [km s!u-1!n]',$
+;;        ytit='HCO!u+!n V!dLSR!n  [km s!u-1!n]',charsize=1.0
+
+ikp = where(covlsr NE 0 AND v.mol[0].vlsr NE 0, nikp)
+cgPlot,covlsr[ikp],v[ikp].mol[0].vlsr,psym=16,symsize=0.4,xr=[-50,150],$
+       xtit='!u13!nCO V!dLSR!n  [km s!u-1!n]',$
+       ytit='HCO!u+!n V!dLSR!n  [km s!u-1!n]',charsize=1.0
+
+iki = where( abs(covlsr[ikp]-v[ikp].mol[0].vlsr) GE 5, niki)
+al_legend,/top,/left,box=0,charsize=0.8,$
+          ['Fraction w/ > 5 km/s diff: '+$
+           string(float(niki)/nikp,format="(F0.3)")]
+
+multiplot,/doyaxis
+
+cgsig = cgSymbol('sigma')
+
+plothist,covlsr[ikp]-v[ikp].mol[0].vlsr,bin=0.2,xr=[-12,12],/xst,$
+         xtit='!u13!nCO V!dLSR!n - HCO!u+!n V!dLSR!n  [km s!u-1!n]',$
+         charsize=1.0,ytit='N per bin',xarr,yarr
+yf = mpfitpeak(xarr,yarr,A,nterms=3)
+cgOplot,xarr,yf,color='orange'
+cgAxis,xaxis=0,/xst,xtickformat='blank_axis'
+al_legend,/top,/right,[cgsig+' = '+string(A[2],format="(F0.2)")+' km/s'],$
+          charsize=0.8
+
+myps,/done,/mp
+
+;;===================================================================
+;; Linewidths
+myps,'../plots/hcop_thco_lw.eps',xsize=10
+multiplot_xm,[2,1],xgap=0.04,mpcharsize=1.0
+;; cgPlot,covlsr,v.mol[0].vlsr,psym=16,symsize=0.4,xr=[-50,150],$
+;;        xtit='!u13!nCO V!dLSR!n  [km s!u-1!n]',$
+;;        ytit='HCO!u+!n V!dLSR!n  [km s!u-1!n]',charsize=1.0
+
+ikp = where(colw NE 0 AND v.mol[0].lw NE 0)
+cgPlot,colw[ikp],v[ikp].mol[0].lw,psym=16,symsize=0.4,$;xr=[-50,150],$
+       xtit='!u13!nCO V!dLSR!n FWHM  [km s!u-1!n]',$
+       ytit='HCO!u+!n V!dLSR!n FWHM  [km s!u-1!n]',charsize=1.0
+one2one,color='red',linestyle=3
+multiplot,/doyaxis
+
+plothist,colw[ikp]-v[ikp].mol[0].lw,bin=0.2,$;xr=[-12,12],/xst,$
+         xtit='!u13!nCO V!dLSR!n FWHM - HCO!u+!n V!dLSR!n FWHM  [km s!u-1!n]',$
+         charsize=1.0,ytit='N per bin',xarr,yarr
+yf = mpfitpeak(xarr,yarr,A,nterms=3)
+cgOplot,xarr,yf,color='orange'
+al_legend,/top,/right,[cgsig+' = '+string(A[2],format="(F0.2)")+' km/s'],$
+          charsize=0.8
+
+myps,/done,/mp
+
+
+
+
+
+
+iii = where(covlsr NE 0, niii)
+print,niii,float(niii)/n
+
 
 END
 
