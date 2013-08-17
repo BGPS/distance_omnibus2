@@ -25,8 +25,8 @@ we have extracted velocities for a significant number of sources.  There is pyth
 code for the extraction component in `python/spectrum_extraction/ <python/spectrum_extraction/>`_, but Tim did
 most of the work using IDL.  
 
-.. warning:: TODO: Describe method in more detail.  A figure showing the rind & core
-   regions would be very helpful here.
+TODO: Describe method in more detail.  A figure showing the rind & core regions
+would be very helpful here.
 
 These plots are the most important.  First, the HCO+ and |13CO| *peak*
 velocities match 85% of the time when using this method.  This is about 5%
@@ -95,7 +95,7 @@ information about which clumps sit inside which clouds.
 Dendrogramming worked, and produced sigma-R diagrams, but there is a great deal
 of uncertainty left in these, and they don't match predictions yet.
 
-.. warning:: TODO: add figures
+TODO: add figures
 
 .. _the Distance Omnibus conference proceedings letter: http://adsabs.harvard.edu/abs/2010ASPC..438...76R 
 .. |13CO| replace:: :sup:`13` CO
