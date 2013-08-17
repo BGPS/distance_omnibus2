@@ -14,7 +14,8 @@ pb = progressbar.ProgressBar()
 
 # 306 = 60 km/s
 cropn = 50
-grs = fits.getdata('grs-28-cube.fits')#[:306,cropn:-cropn,cropn:-cropn]
+#grs = fits.getdata('grs-28-cube.fits')[:306,:150,:150]
+grs = fits.getdata('grs-28-cube.fits')[:,:100,:100]
 grsh = fits.getheader('grs-28-cube.fits')
 
 # In [55]: (1*u.K).to(u.Jy,jytok((46*u.arcsec)**2*pi,110*u.GHz))
@@ -97,7 +98,6 @@ for r,v in zip(radii,vrms):
 
 markerd = mpl.markers.MarkerStyle.markers.copy()
 markerd.pop(None)
-markerd.pop('k')
 markers = itertools.cycle(markerd)
 
 trunkcolors = {}
@@ -108,6 +108,8 @@ ax = pl.gca()
 for trunk in trunk_leaves:
     if trunk_leaves[trunk][0] in leaf_stats:
         color = ax._get_lines.color_cycle.next()
+        if color == 'k':
+            color = ax._get_lines.color_cycle.next()
         trunkcolors[trunk] = color
         for leaf in trunk_leaves[trunk]:
             r = np.array([(x.value*as_to_pc)**0.5 for x in leaf_radii[leaf]])
@@ -212,4 +214,4 @@ for jj,trunk in enumerate(shallow_slopes):
 
 pl.show()
 
-viewer = grsD.viewer(fignum=1)
+#viewer = grsD.viewer(fignum=1)
