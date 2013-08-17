@@ -17,5 +17,6 @@ setup(name='spectrum_extraction',
       author='Adam Ginsburg',
       author_email='adam.g.ginsburg@gmail.com',
       url='https://github.com/BGPS/distance_omnibus2',
-      packages=['spectrum_extraction'],
+      packages=['spectrum_extraction','pca_distance','nirex'],
+      scripts=['scripts/*py'],
      )
