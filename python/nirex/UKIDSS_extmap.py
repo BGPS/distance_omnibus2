@@ -1,7 +1,9 @@
 from astroquery import ukidss,magpis
 from astropy import coordinates as coords
+from scipy.ndimage.morphology import binary_dilation
 import astropy.units as u
 import matplotlib
+import matplotlib.path
 import matplotlib._cntr as _cntr
 import pylab
 import numpy as np
@@ -231,3 +233,28 @@ def contour_segments(p):
 def contour_area(p):
     return 0.5 * abs(sum(x0*y1 - x1*y0
                          for ((x0, y0), (x1, y1)) in segments(p)))
+
+def counts_in_contour(contours, fitsim, dilate=2):
+
+    if not isinstance(contours, matplotlib.path.Path):
+        contours = matplotlib.path.Path(contours)
+
+    header = fitsim.header
+    img = fitsim.data
+
+    wcs = pywcs.WCS(header)
+    #wcsgrid = wcs.wcs_pix2world( np.array(zip(np.arange(wcs.naxis1),np.arange(wcs.naxis2))), 0 ).T
+    yy,xx = np.indices(img.shape)
+    wyx = wcs.wcs_pix2world(zip(yy.ravel(),xx.ravel()),0)
+    mask = contours.contains_points(wyx)
+
+    #pix_paths = [wcs.wcs_world2pix(p,0) for p in contours]
+
+    mask = mask.reshape(img.shape)
+
+    inside = img[mask].sum()
+
+    rind = np.array(binary_dilation(mask, iterations=dilate) - mask,dtype='bool')
+    outside = img[rind].mean()
+
+    return inside-outside*mask.sum()

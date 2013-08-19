@@ -76,3 +76,4 @@ for c in coords:
         show_contours_on_extinction(C30,exm)
 
     pl.show()
+
