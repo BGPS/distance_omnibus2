@@ -22,7 +22,10 @@ FOR i=0,n-1 DO BEGIN
    
 ENDFOR
 
-cnums = minmax(cn)
+
+
+;; cnums = minmax(cn)
+cnums = minmax(s.cnum)
 print,cnums
 
 
@@ -42,15 +45,17 @@ v_std = findgen(1500)*0.2 + (-100.)
 
 SKIPPLOT = 1b
 
+hco_one = ~v.mol[0].multiv
 
-hcop   = v.mol[0].tmb * (~v.mol[0].multiv)
-thco   = dblarr(n)
-covlsr = dblarr(n)
-colw   = dblarr(n)
-thcoon = dblarr(n)
-mvrat  = bytarr(n)
+hcop   = v.mol[0].tmb * hco_one ; HCO+ Tmb
+thco   = dblarr(n)              ; 13CO On-Off Tmb
+covlsr = dblarr(n)              ; 13CO vlsr
+colw   = dblarr(n)              ; 13CO linewidth
+thcoon = dblarr(n)              ; 13CO On Tmb
+mvrat  = dblarr(n)              ; Ratio of peaks for multi-velocity 13CO
+nsegs  = bytarr(n)              ; Number of spectrum segments
 
-FOR i=0,n-1 DO BEGIN
+FOR i=0,n-1 DO BEGIN            ; Loop through the N sources
    
    sp   = grs[i].spectrum
    spon = grs[i].onspec
@@ -73,7 +78,7 @@ FOR i=0,n-1 DO BEGIN
    
    sigind = where(sp GE 0.30, ns)
    IF ns GT 1 THEN BEGIN        ; Only consider detections
-      print,[ns,minmax(v_std[sigind]),max(v_std[sigind])-min(v_std[sigind])]
+      ;; print,[ns,minmax(v_std[sigind]),max(v_std[sigind])-min(v_std[sigind])]
       
       step = sigind[1:*]-sigind[0:*]
       ;; help,step,sigind
@@ -82,6 +87,9 @@ FOR i=0,n-1 DO BEGIN
       ;;===================================================
       IF max(step) EQ 1 THEN BEGIN ; Single peak
          
+         nseg = 1
+         mvrat[i] = 0.
+
          ;;GOTO, skipsingle
          ;; print,'PLOT!!!'
          estimates = [max(sp),v_std[median(sigind)],2]
@@ -128,15 +136,15 @@ FOR i=0,n-1 DO BEGIN
             
             ;;print,A[1],A[0]
             
-            tastar[jjj] = A[0]
+            tastar[jjj] = max(sp[sigind2],jjjj)
             
-            IF A[0] LT tpk THEN CONTINUE
+            IF tastar[jjj] LT tpk THEN CONTINUE
             covlsr[i] = A[1]
             colw[i]   = A[2] * 2.355
-            thco[i]   = max(sp,jjjj)
+            thco[i]   = max(sp[sigind2],jjjj)
             thcoon[i] = spon[jjjj]
             
-            tpk = A[0]
+            tpk = max(sp[sigind2],jjjj)
             
             ;; print,'Segment '+strtrim(jjj+1,2),$
             ;;       n_elements(step[startind:ist[jjj]])
@@ -150,13 +158,21 @@ FOR i=0,n-1 DO BEGIN
          
          ;; FIND THE SMALLEST TPK/TASTAR RATIO GREATER THAN 1!
          
-         print,'TASTAR: ',tpk / tastar
+         tastar = tpk / tastar
+         ind = where(tastar GT 1., nother)
+         print,'Smallest ratio: ',min(tastar[ind])
+         
+         mvrat[i] = min(tastar[ind])
          
       ENDELSE
+      
+      nsegs[i] = nseg
    ENDIF
    
    IF ~skipplot THEN wait,0.5
 ENDFOR
+delta = thco*(mvrat - 1.d) / mvrat
+keepmv = (mvrat EQ 0) OR (mvrat GE 1.5)
 
 ;;===================================================================
 ;; CO TA vs. BGPS Flux Density
@@ -219,21 +235,29 @@ myps,/done
 
 ;;===================================================================
 ;; Velocities
-myps,'../plots/hcop_thco_vlsr.eps',xsize=10
+myps,'../plots/hcop_thco_vlsr.eps',xsize=10,ysize=4.5
 multiplot_xm,[2,1],xgap=0.04,mpcharsize=1.0
 ;; cgPlot,covlsr,v.mol[0].vlsr,psym=16,symsize=0.4,xr=[-50,150],$
 ;;        xtit='!u13!nCO V!dLSR!n  [km s!u-1!n]',$
 ;;        ytit='HCO!u+!n V!dLSR!n  [km s!u-1!n]',charsize=1.0
 
-ikp = where(covlsr NE 0 AND v.mol[0].vlsr NE 0, nikp)
+ikp = where(covlsr NE 0 AND v.mol[0].vlsr NE 0 AND hco_one AND keepmv, nikp)
 cgPlot,covlsr[ikp],v[ikp].mol[0].vlsr,psym=16,symsize=0.4,xr=[-50,150],$
        xtit='!u13!nCO V!dLSR!n  [km s!u-1!n]',$
        ytit='HCO!u+!n V!dLSR!n  [km s!u-1!n]',charsize=1.0
+vline,/h,-5
 
 iki = where( abs(covlsr[ikp]-v[ikp].mol[0].vlsr) GE 5, niki)
 al_legend,/top,/left,box=0,charsize=0.8,$
           ['Fraction w/ > 5 km/s diff: '+$
            string(float(niki)/nikp,format="(F0.3)")]
+
+iik = where(v[ikp].mol[0].vlsr LE -5)
+cgOplot,covlsr[ikp[iik]],v[ikp[iik]].mol[0].vlsr,psym=16,symsize=0.4,$
+        color='deep pink'
+
+cgPlots,[-10,150],[-50,110],linestyle=3,color='blk4'
+cgPlots,[-50,110],[-10,150],linestyle=3,color='blk4'
 
 multiplot,/doyaxis
 
@@ -243,10 +267,10 @@ plothist,covlsr[ikp]-v[ikp].mol[0].vlsr,bin=0.2,xr=[-12,12],/xst,$
          xtit='!u13!nCO V!dLSR!n - HCO!u+!n V!dLSR!n  [km s!u-1!n]',$
          charsize=1.0,ytit='N per bin',xarr,yarr
 yf = mpfitpeak(xarr,yarr,A,nterms=3)
-cgOplot,xarr,yf,color='orange'
+cgOplot,xarr,yf,color='cyan'
 cgAxis,xaxis=0,/xst,xtickformat='blank_axis'
 al_legend,/top,/right,[cgsig+' = '+string(A[2],format="(F0.2)")+' km/s'],$
-          charsize=0.8
+          charsize=0.8,linestyle=0,color='cyan',linsize=0.5
 
 myps,/done,/mp
 
@@ -258,7 +282,6 @@ multiplot_xm,[2,1],xgap=0.04,mpcharsize=1.0
 ;;        xtit='!u13!nCO V!dLSR!n  [km s!u-1!n]',$
 ;;        ytit='HCO!u+!n V!dLSR!n  [km s!u-1!n]',charsize=1.0
 
-ikp = where(colw NE 0 AND v.mol[0].lw NE 0)
 cgPlot,colw[ikp],v[ikp].mol[0].lw,psym=16,symsize=0.4,$;xr=[-50,150],$
        xtit='!u13!nCO V!dLSR!n FWHM  [km s!u-1!n]',$
        ytit='HCO!u+!n V!dLSR!n FWHM  [km s!u-1!n]',charsize=1.0
@@ -276,15 +299,176 @@ al_legend,/top,/right,[cgsig+' = '+string(A[2],format="(F0.2)")+' km/s'],$
 myps,/done,/mp
 
 
+;;===================================================================
+;; 13CO multi-vel peak ratio versus 13CO - HCO+ velocity diff
+myps,'../plots/vdiff_vs_mvrat.eps',xsize=10,ysize=10
+multiplot_xm,[2,2],gap=0.035,mpcharsize=1.0,/doyaxis,/doxaxis
+
+ikp2 = where(v.mol[0].vlsr NE 0 AND mvrat GT 0.5 AND hco_one, nikp2)
+
+cgPlot,abs(covlsr[ikp2]-v[ikp2].mol[0].vlsr),mvrat[ikp2],psym=16,symsize=0.4,$
+       xtit='|!u13!nCO V!dLSR!n - HCO!u+!n V!dLSR!n|  [km s!u-1!n]',$
+       charsize=1.0,xr=[-5,85],/xst,$
+       ytit='!u13!nCO Multiple-Velocity Peak Ratio',yr=[0.5,10],/yst
+
+vline,/h,2,color='cyan'
+vline,/h,1.5,color='lime green'
+vline,/h,1.25,color='crimson'
+
+vline,40,color='blk4',linestyle=3
+
+iik = where(v[ikp2].mol[0].vlsr LT -5, niik)
+IF niik NE 0 THEN cgOplot,abs(covlsr[ikp2[iik]]-v[ikp2[iik]].mol[0].vlsr),$
+                          mvrat[ikp2[iik]],psym=16,symsize=0.4,color='deep pink'
+
+multiplot,/doyaxis,/doxaxis
+
+plothist,mvrat,bin=0.2,xr=!y.crange,/xst,yst=8,charsize=1.0,$
+         ytit='N',xtit='!u13!nCO Multiple-Velocity Peak Ratio'
+vline,1
+
+cgaxis,yaxis=1,yr=[0,1],/save,ytit='CDF',charsize=1.0,color='blk5'
+mvi = where(mvrat GT 0.5)
+mvcdf = mvrat[mvi]
+cdf = ccdf(mvcdf,/cdf)
+cgOplot,mvcdf,cdf,color='blk5'
+vline,2,color='cyan'
+vline,1.5,color='lime green'
+vline,1.25,color='crimson'
+vline,/h,interpol(cdf,mvcdf,2),color='cyan'
+vline,/h,interpol(cdf,mvcdf,1.5),color='lime green'
+vline,/h,interpol(cdf,mvcdf,1.25),color='crimson'
+
+multiplot,/doyaxis,/doxaxis
+;; DELTA
+
+;; ikp2 = where(v.mol[0].vlsr NE 0 AND mvrat GT 0.5 AND hco_one, nikp2)
+
+cgPlot,abs(covlsr[ikp2]-v[ikp2].mol[0].vlsr),delta[ikp2],psym=16,symsize=0.4,$
+       xtit='|!u13!nCO V!dLSR!n - HCO!u+!n V!dLSR!n|  [km s!u-1!n]',$
+       charsize=1.0,xr=[-5,85],/xst,$
+       ytit='!u13!nCO Multiple-Velocity Peak Delta  [K]',yr=[-0.3,3.5],/yst
+
+vline,/h,0.3,color='cyan'
+;; vline,/h,1.5,color='cyan'
+;; vline,/h,1.25,color='cyan'
+
+vline,40,color='blk4',linestyle=3
+
+iik = where(v[ikp2].mol[0].vlsr LT -5, niik)
+IF niik NE 0 THEN cgOplot,abs(covlsr[ikp2[iik]]-v[ikp2[iik]].mol[0].vlsr),$
+                          delta[ikp2[iik]],psym=16,symsize=0.4,color='deep pink'
+
+multiplot,/doyaxis,/doxaxis
+
+plothist,delta[where(finite(delta))],bin=0.05,xr=!y.crange,/xst,ytit='N',yst=8,$
+         charsize=1.0,xtit='!u13!nCO Multiple-Velocity Peak Delta  [K]'
 
 
+cgaxis,yaxis=1,yr=[0,1],/save,ytit='CDF',charsize=1.0,color='blk5'
+mvi = where(mvrat GT 0.5)
+mvcdf = delta[mvi]
+cdf = ccdf(mvcdf,/cdf)
+cgOplot,mvcdf,cdf,color='blk5'
+vline,0.3,color='cyan'
+;; vline,1.5,color='lime green'
+;; vline,1.25,color='crimson'
+vline,/h,interpol(cdf,mvcdf,0.3),color='cyan'
+;; vline,/h,interpol(cdf,mvcdf,1.5),color='lime green'
+;; vline,/h,interpol(cdf,mvcdf,1.25),color='crimson'
+
+myps,/done,/mp
+
+
+;;===================================================================
+;; 13CO multi-vel peak ratio versus 13CO On-Off Tmb
+myps,'../plots/mvrat_vs_thco_tmb.eps'
+
+ikp3 = where( (v.mol[0].vlsr EQ 0 OR ~hco_one) AND mvrat GT 0.5,  nikp3)
+print,'HCO+ Flag = 0: ',nikp3
+
+
+cgPlot,thco[ikp2],mvrat[ikp2],psym=16,symsize=0.4,charsize=1.0,$
+       xtit='!u13!nCO On-Off T!dA!u*!n  [K]',/nodata,yr=[0.5,10],/yst,$
+       ytit='!u13!nCO Multiple-Velocity Peak Ratio'
+
+xp = findgen(101)/100.*(!x.crange[1]-!x.crange[0])+!x.crange[0]
+ikk = where(xp GT 0.3)
+cgOplot,xp[ikk],1.d/(1.d - 0.3d/xp[ikk]),color='lime green',linestyle=4
+
+vline,/h,color='blk5',linestyle=4,1.5
+cgPlots,[1,!y.crange[1]]*0.3,[1,!y.crange[1]],color='crimson',linestyle=3
+cgPlots,[0.3,!x.crange[1]],[1,1],color='crimson',linestyle=3
+
+cgOplot,thco[ikp3],mvrat[ikp3],psym=16,symsize=0.4,color='black'
+cgOplot,thco[ikp2],mvrat[ikp2],psym=16,symsize=0.4,color='cyan'
+
+al_legend,/top,/left,psym=16,symsize=0.7,color=['black','cyan'],box=0,$
+          ['No HCO!u+!n Velocity','Yes HCO!u+!n Velocity'],/clear
+
+cgText,2.5,0.70,'Minimally Distinct',charsize=0.8,color='crimson',align=0.5
+cgText,1.8,6.25,'Maximally Distinct',charsize=0.8,color='crimson',$
+       orien=44,alig=0.5
+cgText,0.4,6,cgSymbol('Delta')+'T = 0.3 K',charsize=0.8,align=0.5,$
+       color='lime green',orien=-87
+
+
+myps,/done
+
+
+;;===================================================================
+;; 13CO multi-vel peak DELTA versus 13CO On-Off Tmb
+myps,'../plots/delta_vs_thco_tmb.eps'
+
+ikp3 = where( (v.mol[0].vlsr EQ 0 OR ~hco_one) AND mvrat GT 0.5,  nikp3)
+print,'HCO+ Flag = 0: ',nikp3
+
+cgPlot,thco[ikp2],delta[ikp2],psym=16,symsize=0.4,charsize=1.0,$
+       xtit='!u13!nCO On-Off T!dA!u*!n  [K]',/nodata,yr=[-0.3,3.5],/yst,$
+       ytit='!u13!nCO Multiple-Velocity Peak Delta  [K]'
+
+vline,/h,0.3,color='lime green',linestyle=4
+xp = findgen(101)/100.*(!x.crange[1]-!x.crange[0])+!x.crange[0]
+cgOplot,xp,xp/3.,color='blk5',linestyle=4
+
+cgPlots,[0.3,!x.crange[1]],[0,0],color='crimson',linestyle=3
+cgPlots,[0,!y.crange[1]]+0.3,[0,!y.crange[1]],color='crimson',linestyle=3
+
+cgOplot,thco[ikp3],delta[ikp3],psym=16,symsize=0.4,color='black'
+cgOplot,thco[ikp2],delta[ikp2],psym=16,symsize=0.4,color='cyan'
+
+al_legend,/top,/left,psym=16,symsize=0.7,color=['black','cyan'],box=0,$
+          ['No HCO!u+!n Velocity','Yes HCO!u+!n Velocity']
+
+cgText,2.5,-0.20,'Minimally Distinct',charsize=0.8,color='crimson',align=0.5
+cgText,1.8,1.61,'Maximally Distinct',charsize=0.8,color='crimson',$
+       orien=37,alig=0.5
+cgText,3,1.05,'MVRAT = 1.5',charsize=0.8,color='blk5',align=0.5,orien=15
+
+
+myps,/done
 
 
 iii = where(covlsr NE 0, niii)
 print,niii,float(niii)/n
 
 
+
+
+
+
+
 END
+;;===========================================================================
+;;===========================================================================
+;;===========================================================================
+;;===========================================================================
+;;===========================================================================
+;;===========================================================================
+
+
+
+
 
 
 lv = readfits('/d1/BGPS/distance-omnibus/local/13co_lv/13COGAL_LV_plot.fits',hd)
@@ -390,6 +574,8 @@ plotmap,synlvbdr,synhd,ct=41,axsel=7,/notsquare,charsize=1.0,xtickformat="(F0.1)
         range=spr,/log
 cgOplot,v.l,v.vlsr,psym=16,symsize=0.7,color='black'
 print,spr
+
+
 
 
 
